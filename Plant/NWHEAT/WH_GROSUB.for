@@ -432,6 +432,8 @@ C The statements begining with !*! are refer to APSIM source codes
       INTEGER     LUNECO
       REAL        TBASE,TOPT,ROPT,TTOP, P2O,VREQ,GDDE,DSGFT,RUE1,RUE2
       REAL        KVAL1,KVAL2,OBASE  ! JG added for ecotype file
+      REAL        GNDFR  ! Messium: grain N deficit fill rate (0-1)
+      REAL        dfleft ! Messium: unmet grain N deficit demand (g/plant)
       
       INTEGER         FOUND  
       REAL        FSLFW
@@ -810,10 +812,12 @@ C 60         FORMAT(25X,F5.2,13X,F5.2,7X,F5.2)
      &             P5AF,P6AF,ADLAI,ADTIL,ADPHO,STEMN,MXNUP,MXNCR,WFNU,
      &             PNUPR,EXNO3,MNNO3,EXNH4,MNNH4,INGWT,INGNC,FREAR,
      &             MNNCR,GPPSS,GPPES,MXGWT,MNRTN,NOMOB,RTDP1,RTDP2,
-     &             FOZ1,SFOZ1,OBASE
-3100          FORMAT (A6,1X,A16,1X,49(F6.0))
+     &             FOZ1,SFOZ1,OBASE,GNDFR
+3100          FORMAT (A6,1X,A16,1X,50(F6.0))
 
               IF (ERRNUM .NE. 0) CALL ERROR(ERRKEY,ERRNUM,FILEE,LNUM)
+!             Blank GNDFR column reads as 0 (no deficit catch-up)
+              GNDFR = MIN(MAX(GNDFR, 0.0), 1.0)
         
             ELSEIF (ISECT .EQ. 0) THEN
               CALL ERROR(ERRKEY,7,FILEE,LNUM)
@@ -2400,8 +2404,10 @@ cSenthold-1
 !*!       (from APSIM NWheat subroutine nwheats_gndmd) 
 !---------------------------------------------------------------------- 
 
-      CALL nwheats_gndmd (Istage, tempmx, tempmn, dtt, gpp, !Input
-     &   gndmd_est)                                             !Output
+!     Messium: structural grain N demand, new grain at MNNCR (see
+!     nwheats_grnit), so grain growth is only N-limited when plant N
+!     supply cannot meet the minimum grain N concentration.
+      gndmd_est = MNNCR / 100. * pl_dmd(grain_part)
 
 !---------------------------------------------------------------------- 
 !*! End WHAPS calculation of grain nitrogen demand 
@@ -2961,7 +2967,9 @@ cnh         dtiln = dtt * 0.005 * (rtsw - 1.)
      &        Istage, dtt, gpp, gro_wt, mnc, MXNCR, nfact,        !Input
      &        nitmn, npot, optfr, part, pl_la, pl_nit,            !Input
      &        plantwt, sen_la, tempmn, tempmx, trans_wt,          !Input
-     &        pntrans)                                           !Output
+     &        GNDFR, MNNCR, MXGWT, cnc,                           !Input
+     &        pgdd(grnfil) - sumstgdtt(grnfil),                   !Input
+     &        pntrans, dfleft)                                   !Output
 *     ==================================================================
 ! translocate N -  update plant pools
       pl_nit(grain_part) = pl_nit(grain_part) 
@@ -2980,7 +2988,7 @@ cnh         dtiln = dtt * 0.005 * (rtsw - 1.)
      &      g_uptake_source, gro_wt, MNNH4, MNNO3, MXNUP,         !Input
      &      pcarbo, pl_nit,  plantwt, PLTPOP,                     !Input
      &      PNUPR/1000000, rlv_nw, snh4, sno3, swdep,             !Input
-     &      WFNU, xstag_nw,                                       !Input
+     &      WFNU, xstag_nw, dfleft,                               !Input
      &      pnup, snup_nh4, snup_no3)                            !Output
 *     ==================================================================
        ptnup = sum_real_array (pnup, mxpart)
